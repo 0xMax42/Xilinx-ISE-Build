@@ -12,7 +12,7 @@
 # Version
 ###########################################################################
 
-Makefile_Version := 1.0.3
+Makefile_Version := 1.1.3
 $(info ISE Makefile Version: $(Makefile_Version))
 
 ###########################################################################
@@ -50,6 +50,9 @@ PAR_OPTS         ?=
 BITGEN_OPTS      ?=
 TRACE_OPTS       ?= -v 3 -n 3
 FUSE_OPTS        ?= -incremental
+
+ISIM_OPTS		 ?= -gui
+ISIM_CMD		 ?= vcd dumpfile $@.vcd\nvcd dumpvars -m /UUT\nrun all\nvcd dumpflush\nquit
  
 PROGRAMMER       ?= none
 PROGRAMMER_PRE   ?=
@@ -114,6 +117,24 @@ $(eval $(call process_sources,$(VHDSOURCE),VHD_LIBS,VHD_PATHS))
 # Run the function for Verilog sources
 $(eval $(call process_sources,$(VSOURCE),V_LIBS,V_PATHS))
 
+## Tests
+
+# Initialize the libs and paths variables for VHDL and Verilog testbenches
+VHD_TEST_PATHS ?=
+VHD_TEST_LIBS  ?=
+V_TEST_PATHS   ?=
+V_TEST_LIBS    ?=
+
+# Run the function for VHDL tests
+$(eval $(call process_sources,$(VHDTEST),VHD_TEST_LIBS,VHD_TEST_PATHS))
+# Run the function for Verilog tests
+$(eval $(call process_sources,$(VTEST),V_TEST_LIBS,V_TEST_PATHS))
+
+# Get the test names..
+TEST_PATHS = $(foreach file,$(V_TEST_PATHS) $(VHD_TEST_PATHS),$(basename $(file)))
+TEST_NAMES = $(foreach path,$(TEST_PATHS),$(notdir $(path)))
+TEST_EXES = $(foreach test,$(TEST_NAMES),$(BUILD_DIR)/isim_$(test)$(EXE))
+
 ###########################################################################
 # Default build
 ###########################################################################
@@ -133,8 +154,8 @@ $(BUILD_DIR)/$(PROJECT).prj: ../project.cfg
 
 $(BUILD_DIR)/$(PROJECT)_sim.prj: $(BUILD_DIR)/$(PROJECT).prj
 	@cp $(BUILD_DIR)/$(PROJECT).prj $@
-	@$(foreach file,$(VTEST),echo "verilog work \"../../$(file)\"" >> $@;)
-	@$(foreach file,$(VHDTEST),echo "vhdl work \"../../$(file)\"" >> $@;)
+	@$(foreach idx,$(shell seq 1 $(words $(V_TEST_PATHS))),echo "verilog $(word $(idx),$(V_TEST_LIBS)) \"../$(word $(idx),$(V_TEST_PATHS))\"" >> $@;)
+	@$(foreach idx,$(shell seq 1 $(words $(VHD_TEST_PATHS))),echo "vhdl $(word $(idx),$(VHD_TEST_LIBS)) \"../$(word $(idx),$(VHD_TEST_PATHS))\"" >> $@;)
 	@echo "verilog work $(XILINX)/verilog/src/glbl.v" >> $@
 
 $(BUILD_DIR)/$(PROJECT).scr: ../project.cfg
@@ -176,7 +197,9 @@ $(BITFILE): ../project.cfg $(V_PATHS) $(VHD_PATHS) ../$(CONSTRAINTS) $(BUILD_DIR
 	@echo "\e[1;97m===== Pinout Summary Report ======\e[m"
 	@echo "\e[1;35m ./$(BUILD_DIR)/$(PROJECT)_pad.txt\e[m\n"
 	
-
+copy: $(BITFILE)
+	@cp $(BITFILE) $(COPY_TARGET_DIR)/$(PROJECT).bit
+	@echo "\n\e[1;32m= Copy bitfile successful =\e[m\n"
 
 ###########################################################################
 # Testing (work in progress)
@@ -189,23 +212,22 @@ trace: ../project.cfg $(BITFILE)
 	@echo "\e[1;97m===== Timing Summary Report ======\e[m"
 	@echo "\e[1;35m ./$(BUILD_DIR)/$(PROJECT).twr\e[m\n"
 
-test: $(TEST_EXES)
+test: buildtest runtest
 
-$(BUILD_DIR)/isim_%$(EXE): $(V_PATHS) $(VHD_PATHS) $(BUILD_DIR)/$(PROJECT)_sim.prj $(VTEST) $(VHDTEST)
+runtest: ${TEST_NAMES}
+
+${TEST_NAMES}:
+	@grep --no-filename --no-messages 'ISIM:' $@.{v,vhd} | cut -d: -f2 > $(BUILD_DIR)/isim_$@.cmd
+	@echo "$(ISIM_CMD)" >> $(BUILD_DIR)/isim_$@.cmd
+	cd $(BUILD_DIR) ; ./isim_$@$(EXE) $(ISIM_OPTS) -tclbatch isim_$@.cmd ;
+
+buildtest: ${TEST_EXES}
+
+$(BUILD_DIR)/isim_%$(EXE): $(BUILD_DIR)/$(PROJECT)_sim.prj $(V_PATHS) $(VHD_PATHS) ${V_TEST_PATHS} $(VHD_TEST_PATHS)
 	$(call RUN,fuse) $(COMMON_OPTS) $(FUSE_OPTS) \
 	    -prj $(PROJECT)_sim.prj \
 	    -o isim_$*$(EXE) \
 	    work.$* work.glbl
-
-isim: $(BUILD_DIR)/isim_$(TB)$(EXE)
-	@grep --no-filename --no-messages 'ISIM:' $(TB).{v,vhd} | cut -d: -f2 > $(BUILD_DIR)/isim_$(TB).cmd
-	@echo "run all" >> $(BUILD_DIR)/isim_$(TB).cmd
-	cd $(BUILD_DIR) ; ./isim_$(TB)$(EXE) -tclbatch isim_$(TB).cmd
-
-isimgui: $(BUILD_DIR)/isim_$(TB)$(EXE)
-	@grep --no-filename --no-messages 'ISIM:' $(TB).{v,vhd} | cut -d: -f2 > $(BUILD_DIR)/isim_$(TB).cmd
-	@echo "run all" >> $(BUILD_DIR)/isim_$(TB).cmd
-	cd $(BUILD_DIR) ; ./isim_$(TB)$(EXE) -gui -tclbatch isim_$(TB).cmd
 
 
 ###########################################################################
