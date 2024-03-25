@@ -12,7 +12,7 @@
 # Version
 ###########################################################################
 
-Makefile_Version := 1.1.3
+Makefile_Version := 1.1.4
 $(info ISE Makefile Version: $(Makefile_Version))
 
 ###########################################################################
@@ -40,6 +40,7 @@ endif
 TOPLEVEL         ?= $(PROJECT)
 CONSTRAINTS      ?= $(PROJECT).ucf
 BUILD_DIR        ?= working
+REPORT_DIR       ?= reports
 BITFILE          ?= $(BUILD_DIR)/$(PROJECT).bit
  
 COMMON_OPTS      ?= -intstyle xflow
@@ -52,7 +53,7 @@ TRACE_OPTS       ?= -v 3 -n 3
 FUSE_OPTS        ?= -incremental
 
 ISIM_OPTS		 ?= -gui
-ISIM_CMD		 ?= vcd dumpfile $@.vcd\nvcd dumpvars -m /UUT\nrun all\nvcd dumpflush\nquit
+ISIM_CMD		 ?= 
  
 PROGRAMMER       ?= none
 PROGRAMMER_PRE   ?=
@@ -143,10 +144,12 @@ default: $(BITFILE)
 
 clean:
 	rm -rf $(BUILD_DIR)
+	rm -rf $(REPORT_DIR)
 
 $(BUILD_DIR)/$(PROJECT).prj: ../project.cfg
 	@echo "Updating $@"
 	@mkdir -p $(BUILD_DIR)
+	@mkdir -p $(REPORT_DIR)
 	@rm -f $@
 	@$(foreach idx,$(shell seq 1 $(words $(V_PATHS))),echo "verilog $(word $(idx),$(V_LIBS)) \"../$(word $(idx),$(V_PATHS))\"" >> $@;)
 	@$(foreach idx,$(shell seq 1 $(words $(VHD_PATHS))),echo "vhdl $(word $(idx),$(VHD_LIBS)) \"../$(word $(idx),$(VHD_PATHS))\"" >> $@;)
@@ -176,27 +179,31 @@ $(BITFILE): ../project.cfg $(V_PATHS) $(VHD_PATHS) ../$(CONSTRAINTS) $(BUILD_DIR
 	@mkdir -p $(BUILD_DIR)
 	$(call RUN,xst) $(COMMON_OPTS) \
 	    -ifn $(PROJECT).scr
+	@cp ./$(BUILD_DIR)/$(PROJECT).srp $(REPORT_DIR)/$(PROJECT).SynthesisReport
 	$(call RUN,ngdbuild) $(COMMON_OPTS) $(NGDBUILD_OPTS) \
 	    -p $(TARGET_PART) -uc ../../$(CONSTRAINTS) \
 	    $(PROJECT).ngc $(PROJECT).ngd
 	$(call RUN,map) $(COMMON_OPTS) $(MAP_OPTS) \
 	    -p $(TARGET_PART) \
 	    -w $(PROJECT).ngd -o $(PROJECT).map.ncd $(PROJECT).pcf
+	@cp ./$(BUILD_DIR)/$(PROJECT).map.mrp $(REPORT_DIR)/$(PROJECT).MapReport
 	$(call RUN,par) $(COMMON_OPTS) $(PAR_OPTS) \
 	    -w $(PROJECT).map.ncd $(PROJECT).ncd $(PROJECT).pcf
+	@cp ./$(BUILD_DIR)/$(PROJECT).par $(REPORT_DIR)/$(PROJECT).PlaceRouteReport
 	$(call RUN,bitgen) $(COMMON_OPTS) $(BITGEN_OPTS) \
 	    -w $(PROJECT).ncd $(PROJECT).bit
 	@echo "\e[1;32m============ OK ============\e[m\n\n"
 	@echo "\e[1;33m============ Reports.. ===========\e[m\n"
 	@echo "\e[1;97m==== Synthesis Summary Report ====\e[m"
-	@echo "\e[1;35m ./$(BUILD_DIR)/$(PROJECT).srp\e[m\n"
+	@echo "\e[1;35m ./$(REPORT_DIR)/$(PROJECT).SynthesisReport\e[m\n"
 	@echo "\e[1;97m======= Map Summary Report =======\e[m"
-	@echo "\e[1;35m ./$(BUILD_DIR)/$(PROJECT).map.mrp\e[m\n"
+	@echo "\e[1;35m ./$(REPORT_DIR)/$(PROJECT).MapReport\e[m\n"
 	@echo "\e[1;97m======= PAR Summary Report =======\e[m"
-	@echo "\e[1;35m ./$(BUILD_DIR)/$(PROJECT).par\e[m\n"
+	@echo "\e[1;35m ./$(REPORT_DIR)/$(PROJECT).PlaceRouteReport\e[m\n"
 	@echo "\e[1;97m===== Pinout Summary Report ======\e[m"
-	@echo "\e[1;35m ./$(BUILD_DIR)/$(PROJECT)_pad.txt\e[m\n"
-	
+	@cp ./$(BUILD_DIR)/$(PROJECT)_pad.txt $(REPORT_DIR)/$(PROJECT).PinoutReport
+	@echo "\e[1;35m ./$(REPORT_DIR)/$(PROJECT).PinoutReport\e[m\n"
+
 copy: $(BITFILE)
 	@cp $(BITFILE) $(COPY_TARGET_DIR)/$(PROJECT).bit
 	@echo "\n\e[1;32m= Copy bitfile successful =\e[m\n"
@@ -210,6 +217,7 @@ trace: ../project.cfg $(BITFILE)
 	    $(PROJECT).ncd $(PROJECT).pcf
 	@echo "\n\e[1;33m============ Reports.. ===========\e[m\n"
 	@echo "\e[1;97m===== Timing Summary Report ======\e[m"
+	@cp ./$(BUILD_DIR)/$(PROJECT).twr $(REPORT_DIR)/$(PROJECT).TimingReport
 	@echo "\e[1;35m ./$(BUILD_DIR)/$(PROJECT).twr\e[m\n"
 
 test: buildtest runtest
