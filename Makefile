@@ -218,7 +218,7 @@ trace: ../project.cfg $(BITFILE)
 	@echo "\n\e[1;33m============ Reports.. ===========\e[m\n"
 	@echo "\e[1;97m===== Timing Summary Report ======\e[m"
 	@cp ./$(BUILD_DIR)/$(PROJECT).twr $(REPORT_DIR)/$(PROJECT).TimingReport
-	@echo "\e[1;35m ./$(BUILD_DIR)/$(PROJECT).twr\e[m\n"
+	@echo "\e[1;35m ./$(REPORT_DIR)/$(PROJECT).TimingReport\e[m\n"
 
 test: buildtest runtest
 
