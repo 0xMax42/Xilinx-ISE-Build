@@ -12,7 +12,7 @@
 # Version
 ###########################################################################
 
-Makefile_Version := 1.1.4
+Makefile_Version := 1.1.5
 $(info ISE Makefile Version: $(Makefile_Version))
 
 ###########################################################################
@@ -177,6 +177,7 @@ $(BUILD_DIR)/$(PROJECT).scr: ../project.cfg
 
 $(BITFILE): ../project.cfg $(V_PATHS) $(VHD_PATHS) ../$(CONSTRAINTS) $(BUILD_DIR)/$(PROJECT).prj $(BUILD_DIR)/$(PROJECT).scr
 	@mkdir -p $(BUILD_DIR)
+	@mkdir -p $(REPORT_DIR)
 	$(call RUN,xst) $(COMMON_OPTS) \
 	    -ifn $(PROJECT).scr
 	@cp ./$(BUILD_DIR)/$(PROJECT).srp $(REPORT_DIR)/$(PROJECT).SynthesisReport
