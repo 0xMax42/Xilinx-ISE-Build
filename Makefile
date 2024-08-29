@@ -12,7 +12,7 @@
 # Version
 ###########################################################################
 
-Makefile_Version := 1.1.2
+Makefile_Version := 1.2.0-alpha
 $(info ISE Makefile Version: $(Makefile_Version))
 
 ###########################################################################
@@ -40,8 +40,9 @@ endif
 TOPLEVEL         ?= $(PROJECT)
 CONSTRAINTS      ?= $(PROJECT).ucf
 BUILD_DIR        ?= working
+TRANSPILING_DIR  ?= transpiling
 BITFILE          ?= $(BUILD_DIR)/$(PROJECT).bit
- 
+
 COMMON_OPTS      ?= -intstyle xflow
 XST_OPTS         ?=
 NGDBUILD_OPTS    ?=
@@ -172,7 +173,7 @@ $(BUILD_DIR)/$(PROJECT).scr: ../project.cfg
 	    "-p $(TARGET_PART)" \
 	    > $(BUILD_DIR)/$(PROJECT).scr
 
-$(BITFILE): ../project.cfg $(V_PATHS) $(VHD_PATHS) ../$(CONSTRAINTS) $(BUILD_DIR)/$(PROJECT).prj $(BUILD_DIR)/$(PROJECT).scr
+$(BITFILE): ../project.cfg $(V_PATHS) $(VHD_PATHS) ../$(CONSTRAINTS) $(BUILD_DIR)/$(PROJECT).prj transpile $(BUILD_DIR)/$(PROJECT).scr
 	@mkdir -p $(BUILD_DIR)
 	$(call RUN,xst) $(COMMON_OPTS) \
 	    -ifn $(PROJECT).scr
@@ -197,6 +198,25 @@ $(BITFILE): ../project.cfg $(V_PATHS) $(VHD_PATHS) ../$(CONSTRAINTS) $(BUILD_DIR
 	@echo "\e[1;97m===== Pinout Summary Report ======\e[m"
 	@echo "\e[1;35m ./$(BUILD_DIR)/$(PROJECT)_pad.txt\e[m\n"
 	
+###########################################################################
+# Transpiling (work in progress)
+###########################################################################
+
+transpile:
+ifeq ($(TRANSPILING),true)
+	@echo "Transpiling is enabled"
+	@mkdir -p ./$(BUILD_DIR)/$(TRANSPILING_DIR)/dist
+	@for idx in $(shell seq 1 $(words $(VHD_PATHS))); do \
+		vhdl_path=$$(echo $(VHD_PATHS) | cut -d ' ' -f $$idx); \
+		vhdl_lib=$$(echo $(VHD_LIBS) | cut -d ' ' -f $$idx); \
+		echo "Analyzing $$vhdl_path for library $$vhdl_lib..."; \
+		ghdl -a --std=08 --workdir=./$(BUILD_DIR)/$(TRANSPILING_DIR)/dist "./$$vhdl_path"; \
+	done
+	ghdl --synth --std=08 --workdir=./$(BUILD_DIR)/$(TRANSPILING_DIR)/dist --out=raw-vhdl $(TOPLEVEL) > ./$(BUILD_DIR)/$(TRANSPILING_DIR)/$(TOPLEVEL).vhd
+	@echo "vhdl work \"$(TRANSPILING_DIR)/$(TOPLEVEL).vhd\"" > $(BUILD_DIR)/$(PROJECT).prj
+else
+	@echo "Transpiling is disabled"
+endif
 
 
 ###########################################################################
