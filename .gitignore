@@ -1,2 +1,5 @@
 working/
 reports/
+*__pycache__*
+*.venv
+.doit.db
