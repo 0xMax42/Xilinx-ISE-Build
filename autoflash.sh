@@ -76,8 +76,8 @@ echo "👂 Monitoring $BITFILE for changes... (Press Ctrl+C to exit)"
 # ♻️ Infinite watch loop
 while true; do
     inotifywait -e close_write "$BITFILE" >/dev/null 2>&1
-    echo "🌀 Change detected. Waiting 1 second..."
-    sleep 1
+    echo "🌀 Change detected. Waiting 3 second..."
+    sleep 3
     flash_bitstream
     echo "✅ Done. Waiting for next change..."
 done
